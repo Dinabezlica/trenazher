@@ -51,7 +51,7 @@ const GENERATOR_PROMPT = [
   "- warm_databases: старые заявки, анкеты, участники бесплатников, люди которые спрашивали и не купили, контакты клиентов",
   "- where_clients_come_from_now",
   "- inbound_source",
-  "- inbound_context",
+  "- inbound_context: обязательно конкретная тема контента, на который человек отреагировал, если источник — Reels/Stories/пост/прогрев. Например: Почему люди спрашивают цену и пропадают; Почему просмотры не превращаются в заявки; Для запуска не нужен блог на 10 000 подписчиков.",
   "- first_message",
   "- surface_problem",
   "- original_request",
@@ -83,7 +83,7 @@ const GENERATOR_PROMPT = [
   "",
   "Чередуй сценарии: маленький блог / большая аудитория; слабый Instagram, но сильный WhatsApp; хорошие охваты, но мало продаж; большая база старых клиентов; отсутствие базы; первый запуск; несколько запусков с нестабильным результатом; только услуги; товарка; действующее обучение; запрос только на клиентов/Instagram без мысли об обучении.",
   "",
-  "Первое сообщение чаще короткое и естественное: кодовое слово, плюс, запрос условий, цена, вопрос по своей нише, ответ на сторис/прогрев/Reels. Длинные первые сообщения допускаются редко.",
+  "Первое сообщение чаще короткое и естественное: кодовое слово, плюс, запрос условий, цена, вопрос по своей нише, ответ на сторис/прогрев/Reels. Длинные первые сообщения допускаются редко.",\n  "Поле context — это НЕ описание ниши клиента. Это то, что Дина реально видит перед сообщением: откуда человек пришёл и на какую конкретную тему контента он ответил.",\n  "Если человек ответил на контент, context пиши в формате: Ответила на Reels: «конкретная тема/хук ролика» или Ответила на сторис: «конкретная тема сторис».",\n  "Если пришёл по кодовому слову, укажи: Написала кодовое слово «... » после Reels/сторис: «конкретная тема».",\n  "Если человек сам написал без привязки к контенту, честно укажи: Самостоятельно написала узнать условия. Не выдумывай пост.",
   "Не делай человека искусственно сложным и не заставляй его обязательно давать возражение.",
   "Сильная продажа может закончиться простой покупкой.",
   "Если человек объективно не может оплатить, хорошая продажа всё равно остаётся хорошей.",
@@ -314,11 +314,21 @@ function workersAiText(payload) {
 }
 
 function parseJsonLoose(text) {
-  var cleaned = text.trim()
+  var cleaned = String(text || "").trim()
     .replace(/^\x60\x60\x60json\s*/i, "")
     .replace(/^\x60\x60\x60\s*/, "")
     .replace(/\x60\x60\x60\s*$/, "");
-  return JSON.parse(cleaned);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {
+    var first = cleaned.indexOf("{");
+    var last = cleaned.lastIndexOf("}");
+    if (first !== -1 && last > first) {
+      return JSON.parse(cleaned.slice(first, last + 1));
+    }
+    throw new Error("Не удалось прочитать карточку нового клиента.");
+  }
 }
 
 async function openai(env, options) {
@@ -326,14 +336,21 @@ async function openai(env, options) {
     throw new Error("Не подключён Workers AI binding.");
   }
 
-  var result = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+  var request = {
     messages: [
       { role: "system", content: options.instructions },
       { role: "user", content: options.input }
     ],
     max_completion_tokens: options.maxOutput || 2500,
     temperature: options.effort === "medium" ? 0.65 : 0.45
-  });
+  };
+
+  if (options.jsonMode) {
+    request.response_format = { type: "json_object" };
+    request.temperature = 0.5;
+  }
+
+  var result = await env.AI.run("@cf/zai-org/glm-4.7-flash", request);
 
   return workersAiText(result);
 }
@@ -380,7 +397,8 @@ export default {
           instructions: GENERATOR_PROMPT,
           input: "Создай нового случайного, но логичного клиента. Не повторяй шаблонно один и тот же тип ситуации.",
           maxOutput: 4200,
-          effort: "medium"
+          effort: "medium",
+          jsonMode: true
         });
 
         var data = parseJsonLoose(generated);
