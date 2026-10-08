@@ -126,6 +126,9 @@ const CLIENT_PROMPT = [
   "- согласись, если Дина уже поняла базовый запрос и объяснила, зачем конкретно тебе диагностика;",
   "- если хочешь сначала цену или предпочитаешь чат, так и скажи.",
   "Если phase=diagnostic, считай, что вы уже на созвоне в текстовом формате. Не начинай знакомство заново.",
+  "Если вы уже перешли на диагностику, время созвона уже согласовано и созвон уже начался. Не повторяй время, не подтверждай его заново и не возвращайся к договорённости о времени, если Дина сама не спрашивает об этом.",
+  "На технические фразы в начале созвона отвечай буквально и коротко. На «меня слышно?» — просто «Да, слышно.» или близко по смыслу, без повторения времени, условий или прошлой переписки.",
+  "После перехода на диагностику продолжай с того места, где остановились в переписке: всё, что уже выяснили до созвона, считается известным."
   "",
   "Презентация:",
   "- оценивай предложение только как клиент;",
@@ -414,12 +417,15 @@ async function openai(env, options) {
   throw lastError || new Error("Не удалось получить ответ клиента. Попробуй отправить сообщение ещё раз.");
 }
 
-function cleanClientReply(text, messages, state) {
+function cleanClientReply(text, messages, state, phase) {
   var value = String(text || "").trim();
   var clientMessages = (messages || []).filter(function(m) { return m.role === "client"; });
+  var userMessages = (messages || []).filter(function(m) { return m.role === "user"; });
+  var lastUser = userMessages.length ? String(userMessages[userMessages.length - 1].text || "") : "";
 
   // Убираем подпись роли/имени, если модель зачем-то добавила её в начало.
   value = value.replace(/^клиент\s*:\s*/i, "");
+  value = value.replace(/^дина\s*[,.:;\-]\s*/i, "");
   if (state && state.name) {
     var escapedName = String(state.name).replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
     value = value.replace(new RegExp("^" + escapedName + "\\s*:\\s*", "i"), "");
@@ -432,6 +438,12 @@ function cleanClientReply(text, messages, state) {
       .replace(/^(ассал[яа]му\s+алейкум(?:,?\s*дина)?[.!,:;\s-]*)/i, "")
       .replace(/^(ва\s*алейкум\s+ассалам(?:,?\s*дина)?[.!,:;\s-]*)/i, "")
       .trim();
+  }
+
+  // На созвоне технический вопрос "меня слышно?" должен получать технический ответ,
+  // без повторения уже согласованного времени.
+  if (phase === "diagnostic" && /(меня\s+слышно|слышно\s+меня|вы\s+меня\s+слышите|слышите\s+меня)/i.test(lastUser)) {
+    return "Да, слышно.";
   }
 
   return value || String(text || "").trim();
@@ -753,7 +765,7 @@ export default {
           maxOutput: 240,
           effort: "low"
         });
-        reply = cleanClientReply(reply, messages, state);
+        reply = cleanClientReply(reply, messages, state, phase);
         return json({ message: reply, state: state }, 200, origin);
       }
 
