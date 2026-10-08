@@ -361,22 +361,22 @@ async function openai(env, options) {
     throw new Error("Не подключён Workers AI binding.");
   }
 
+  var model = options.cloudflareModel || "@cf/meta/llama-3.1-8b-instruct-fast";
   var request = {
     messages: [
       { role: "system", content: options.instructions },
       { role: "user", content: options.input }
     ],
-    max_completion_tokens: options.maxOutput || 2500,
-    temperature: options.effort === "medium" ? 0.65 : 0.45
+    max_tokens: Math.min(options.maxOutput || 1200, 3000),
+    temperature: options.effort === "medium" ? 0.6 : 0.4
   };
 
   if (options.jsonMode) {
     request.response_format = { type: "json_object" };
-    request.temperature = 0.5;
+    request.temperature = 0.45;
   }
 
-  var model = options.cloudflareModel || "@cf/zai-org/glm-4.7-flash";\n  var result = await env.AI.run(model, request);
-
+  var result = await env.AI.run(model, request);
   return workersAiText(result);
 }
 
@@ -419,7 +419,7 @@ export default {
       if (action === "new_client") {
         var generated = await openai(env, {
           model: "generator",
-          cloudflareModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+          cloudflareModel: "@cf/meta/llama-3.1-8b-instruct-fast",
           instructions: GENERATOR_PROMPT,
           input: "Создай нового случайного, но логичного клиента. Не повторяй шаблонно один и тот же тип ситуации.",
           maxOutput: 4200,
@@ -485,7 +485,8 @@ export default {
 
       if (action === "analysis") {
         var analysis = await openai(env, {
-          model: "gpt-6.1-sol",
+          model: "analysis",
+          cloudflareModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
           instructions: ANALYSIS_PROMPT,
           input: base + "\nСделай итоговый разбор этой продажи.",
           maxOutput: 4200,
