@@ -140,7 +140,7 @@ const CLIENT_PROMPT = [
   "Не выдавай обязательное возражение. Реакция на цену зависит от карточки и качества продажи.",
   "Если говоришь подумаю, причина должна быть настоящей из карточки.",
   "Если Дина нормально уточнит причину, раскрой её.",
-  "Отвечай КОРОТКО И ЕСТЕСТВЕННО. Обычно 1–4 предложения."
+  "Отвечай КОРОТКО И ЕСТЕСТВЕННО. Обычно 1–4 предложения.",\n  "Очень важно: не здоровайся повторно в каждом сообщении. Если приветствие уже было в переписке, продолжай разговор без Привет, Дина, Ассаляму алейкум и других повторных приветствий.",\n  "Если Дина спросила имя, ответь просто именем или коротко: Меня зовут ... Не добавляй новое приветствие.",\n  "Не начинай каждый ответ с имени Дины. Пиши так, будто это непрерывная живая переписка."
 ].join("\n");
 
 const MENTOR_PROMPT = [
@@ -365,23 +365,57 @@ async function openai(env, options) {
     throw new Error("Не подключён Workers AI binding.");
   }
 
-  var model = options.cloudflareModel || "@cf/meta/llama-3.1-8b-instruct-fast";
-  var request = {
-    messages: [
-      { role: "system", content: options.instructions },
-      { role: "user", content: options.input }
-    ],
-    max_tokens: Math.min(options.maxOutput || 1200, 3000),
-    temperature: options.effort === "medium" ? 0.6 : 0.4
-  };
-
-  if (options.jsonMode) {
-    request.response_format = { type: "json_object" };
-    request.temperature = 0.45;
+  var preferred = options.cloudflareModel || "@cf/zai-org/glm-4.7-flash";
+  var models = [preferred];
+  if (preferred !== "@cf/meta/llama-3.1-8b-instruct-fast") {
+    models.push("@cf/meta/llama-3.1-8b-instruct-fast");
   }
 
-  var result = await env.AI.run(model, request);
-  return workersAiText(result);
+  var lastError = null;
+
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    var request = {
+      messages: [
+        { role: "system", content: options.instructions },
+        { role: "user", content: options.input }
+      ],
+      temperature: options.effort === "medium" ? 0.55 : 0.35
+    };
+
+    var limit = Math.min(options.maxOutput || 900, 2600);
+    if (model.indexOf("glm-") !== -1) {
+      request.max_completion_tokens = limit;
+    } else {
+      request.max_tokens = limit;
+    }
+
+    try {
+      var result = await env.AI.run(model, request);
+      var text = workersAiText(result);
+      if (text) return text;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Не удалось получить ответ клиента. Попробуй отправить сообщение ещё раз.");
+}
+
+function cleanClientReply(text, messages) {
+  var value = String(text || "").trim();
+  var clientMessages = (messages || []).filter(function(m) { return m.role === "client"; });
+
+  // После первого сообщения это уже продолжение диалога: убираем повторные приветствия.
+  if (clientMessages.length >= 1) {
+    value = value
+      .replace(/^(привет(?:,?\s*дина)?[.!,:;\s-]*)/i, "")
+      .replace(/^(ассал[яа]му\s+алейкум(?:,?\s*дина)?[.!,:;\s-]*)/i, "")
+      .replace(/^(ва\s*алейкум\s+ассалам(?:,?\s*дина)?[.!,:;\s-]*)/i, "")
+      .trim();
+  }
+
+  return value || String(text || "").trim();
 }
 
 function compactTranscript(messages) {
@@ -696,10 +730,10 @@ export default {
           model: "gpt-6-luna",
           instructions: CLIENT_PROMPT,
           input: base + "\nОтветь на последнее сообщение Дины строго от лица клиента.",
-          maxOutput: 700,
+          maxOutput: 420,
           effort: "low"
         });
-        return json({ message: reply, state: state }, 200, origin);
+        reply = cleanClientReply(reply, messages);\n        return json({ message: reply, state: state }, 200, origin);
       }
 
       if (action === "hint") {
@@ -707,7 +741,7 @@ export default {
           model: "gpt-6-luna",
           instructions: MENTOR_PROMPT,
           input: base + "\nДай подсказку первого уровня. Не пиши готовый ответ клиенту.",
-          maxOutput: 850,
+          maxOutput: 650,
           effort: "medium"
         });
         return json({ text: hint }, 200, origin);
@@ -718,7 +752,7 @@ export default {
           model: "gpt-6-luna",
           instructions: EXAMPLE_PROMPT,
           input: base + "\nДай 1–2 примера следующего вопроса.",
-          maxOutput: 500,
+          maxOutput: 320,
           effort: "low"
         });
         return json({ text: example }, 200, origin);
@@ -727,10 +761,10 @@ export default {
       if (action === "analysis") {
         var analysis = await openai(env, {
           model: "analysis",
-          cloudflareModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+          cloudflareModel: "@cf/zai-org/glm-4.7-flash",
           instructions: ANALYSIS_PROMPT,
           input: base + "\nСделай итоговый разбор этой продажи.",
-          maxOutput: 4200,
+          maxOutput: 2400,
           effort: "medium"
         });
         return json({ text: analysis }, 200, origin);
