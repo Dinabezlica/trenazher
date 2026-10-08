@@ -1,4 +1,4 @@
-const API_URL = "https://PASTE-WORKER-URL-HERE.workers.dev";
+const API_URL = "https://trenazher-api.diana-grigoreva73.workers.dev";
 
 const els = {
   newClientBtn: document.getElementById("newClientBtn"),
