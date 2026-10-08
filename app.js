@@ -206,11 +206,6 @@ async function verifyAccess() {
 async function startNewClient() {
   if (busy) return;
 
-  if (clientState && messages.length > 2) {
-    const ok = confirm("Начать нового клиента? Текущий диалог сбросится.");
-    if (!ok) return;
-  }
-
   setBusy(true);
   showLoader("Создаю нового клиента…");
   openCoach("Новый клиент", "Сейчас ИИ создаёт скрытую карточку. Ты увидишь только то, что увидела бы в реальной переписке.");
@@ -226,7 +221,7 @@ async function startNewClient() {
       message: data.message,
     };
 
-    els.contextBox.textContent = data.context || "";
+    els.contextBox.textContent = data.context ? "Контекст обращения: " + data.context : "";
     els.contextBox.classList.toggle("hidden", !data.context);
     els.retryBtn.classList.remove("hidden");
     updateStage();
@@ -325,7 +320,7 @@ function retrySameClient() {
   clientState = JSON.parse(JSON.stringify(initialSnapshot.state));
   phase = "chat";
   messages = [{ role: "client", text: initialSnapshot.message }];
-  els.contextBox.textContent = initialSnapshot.context || "";
+  els.contextBox.textContent = initialSnapshot.context ? "Контекст обращения: " + initialSnapshot.context : "";
   els.contextBox.classList.toggle("hidden", !initialSnapshot.context);
   updateStage();
   renderMessages();
