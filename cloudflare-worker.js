@@ -292,6 +292,26 @@ function workersAiText(payload) {
     throw new Error("Workers AI не вернул текстовый ответ.");
   }
 
+  var parsedCandidates = [
+    payload.parsed,
+    payload.result && payload.result.parsed,
+    payload.choices && payload.choices[0] && payload.choices[0].message && payload.choices[0].message.parsed,
+    payload.result && payload.result.choices && payload.result.choices[0] && payload.result.choices[0].message && payload.result.choices[0].message.parsed
+  ];
+
+  for (var p = 0; p < parsedCandidates.length; p++) {
+    if (parsedCandidates[p] && typeof parsedCandidates[p] === "object") {
+      return JSON.stringify(parsedCandidates[p]);
+    }
+  }
+
+  if (payload.response && typeof payload.response === "object") {
+    return JSON.stringify(payload.response);
+  }
+  if (payload.result && payload.result.response && typeof payload.result.response === "object") {
+    return JSON.stringify(payload.result.response);
+  }
+
   var candidates = [
     payload.response,
     payload.output_text,
@@ -310,7 +330,12 @@ function workersAiText(payload) {
     if (text) return text;
   }
 
-  throw new Error("Workers AI ответил, но текст не удалось прочитать. Попробуй отправить сообщение ещё раз.");
+  if (payload.context && payload.message && payload.state) {
+    return JSON.stringify(payload);
+  }
+
+  var keys = Object.keys(payload).slice(0, 8).join(", ");
+  throw new Error("Workers AI ответил, но текст не удалось прочитать. Формат ответа: " + (keys || "неизвестный") + ".");
 }
 
 function parseJsonLoose(text) {
