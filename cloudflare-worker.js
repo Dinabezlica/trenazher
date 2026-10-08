@@ -350,7 +350,7 @@ async function openai(env, options) {
     request.temperature = 0.5;
   }
 
-  var result = await env.AI.run("@cf/zai-org/glm-4.7-flash", request);
+  var model = options.cloudflareModel || "@cf/zai-org/glm-4.7-flash";\n  var result = await env.AI.run(model, request);
 
   return workersAiText(result);
 }
@@ -393,7 +393,8 @@ export default {
 
       if (action === "new_client") {
         var generated = await openai(env, {
-          model: "gpt-6-luna",
+          model: "generator",
+          cloudflareModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
           instructions: GENERATOR_PROMPT,
           input: "Создай нового случайного, но логичного клиента. Не повторяй шаблонно один и тот же тип ситуации.",
           maxOutput: 4200,
