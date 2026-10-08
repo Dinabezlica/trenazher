@@ -143,7 +143,9 @@ const CLIENT_PROMPT = [
   "Отвечай КОРОТКО И ЕСТЕСТВЕННО. Обычно 1–4 предложения.",
   "Очень важно: не здоровайся повторно в каждом сообщении. Если приветствие уже было в переписке, продолжай разговор без Привет, Дина, Ассаляму алейкум и других повторных приветствий.",
   "Если Дина спросила имя, ответь просто именем или коротко: Меня зовут ... Не добавляй новое приветствие.",
-  "Не начинай каждый ответ с имени Дины. Пиши так, будто это непрерывная живая переписка."
+  "Не начинай каждый ответ с имени Дины. Пиши так, будто это непрерывная живая переписка.",
+  "Все сгенерированные клиенты в этой версии — женщины. Всегда говори о себе в женском роде: хотела, готова, работала, пробовала, устала, поняла. Никогда не используй мужской род про себя.",
+  "Никогда не начинай сообщение с подписи имени клиента вроде Амина:, Самира:, Марьям: или Клиент:. В чате уже видно, кто пишет."
 ].join("\n");
 
 const MENTOR_PROMPT = [
@@ -405,9 +407,16 @@ async function openai(env, options) {
   throw lastError || new Error("Не удалось получить ответ клиента. Попробуй отправить сообщение ещё раз.");
 }
 
-function cleanClientReply(text, messages) {
+function cleanClientReply(text, messages, state) {
   var value = String(text || "").trim();
   var clientMessages = (messages || []).filter(function(m) { return m.role === "client"; });
+
+  // Убираем подпись роли/имени, если модель зачем-то добавила её в начало.
+  value = value.replace(/^клиент\s*:\s*/i, "");
+  if (state && state.name) {
+    var escapedName = String(state.name).replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
+    value = value.replace(new RegExp("^" + escapedName + "\\s*:\\s*", "i"), "");
+  }
 
   // После первого сообщения это уже продолжение диалога: убираем повторные приветствия.
   if (clientMessages.length >= 1) {
@@ -626,6 +635,7 @@ function generateClientCard() {
     message:firstMessage,
     state:{
       name:name,
+      gender:"female",
       niche:s.niche,
       role_and_experience:s.role + ", " + s.exp,
       what_sells_now:{type:(s.niche === "Мусульманская одежда" || s.niche === "Подарочные боксы" || s.niche === "Свечи / рукоделие") ? "товар" : (s.niche === "Онлайн-обучение" ? "обучение" : "услуга/экспертность"),offer:s.offer},
@@ -736,7 +746,7 @@ export default {
           maxOutput: 420,
           effort: "low"
         });
-        reply = cleanClientReply(reply, messages);
+        reply = cleanClientReply(reply, messages, state);
         return json({ message: reply, state: state }, 200, origin);
       }
 
