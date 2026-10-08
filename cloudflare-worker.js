@@ -736,7 +736,8 @@ export default {
           maxOutput: 420,
           effort: "low"
         });
-        reply = cleanClientReply(reply, messages);\n        return json({ message: reply, state: state }, 200, origin);
+        reply = cleanClientReply(reply, messages);
+        return json({ message: reply, state: state }, 200, origin);
       }
 
       if (action === "hint") {
