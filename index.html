@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#14110f" />
+  <title>Тренажёр продаж</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Личная практика</div>
+        <h1>Тренажёр продаж</h1>
+      </div>
+      <button id="newClientBtn" class="btn btn-primary">Новый клиент</button>
+    </header>
+
+    <main class="layout">
+      <section class="chat-card">
+        <div class="chat-head">
+          <div class="client-meta">
+            <div class="avatar">К</div>
+            <div>
+              <div class="client-title">Потенциальный клиент</div>
+              <div id="stageLabel" class="stage-label">Переписка</div>
+            </div>
+          </div>
+          <button id="diagnosticBtn" class="btn btn-ghost btn-small">Перейти к диагностике</button>
+        </div>
+
+        <div id="contextBox" class="context-box hidden"></div>
+
+        <div id="messages" class="messages">
+          <div class="empty-state">
+            <div class="empty-icon">✦</div>
+            <h2>Начни новую тренировку</h2>
+            <p>ИИ создаст нового клиента и пришлёт первое сообщение.</p>
+            <button id="emptyNewClientBtn" class="btn btn-primary">Новый клиент</button>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <textarea id="messageInput" rows="1" placeholder="Напиши ответ клиенту…" disabled></textarea>
+          <button id="sendBtn" class="send-btn" aria-label="Отправить" disabled>➜</button>
+        </div>
+
+        <div class="chat-actions">
+          <button id="hintBtn" class="btn btn-secondary" disabled>Подсказка</button>
+          <button id="exampleBtn" class="btn btn-secondary" disabled>Пример вопроса</button>
+          <button id="analysisBtn" class="btn btn-outline" disabled>Разобрать продажу</button>
+          <button id="retryBtn" class="btn btn-ghost hidden">Пройти этого клиента ещё раз</button>
+        </div>
+      </section>
+
+      <aside class="coach-card">
+        <div class="coach-head">
+          <div>
+            <div class="eyebrow">Наставник</div>
+            <h2 id="coachTitle">Здесь появится подсказка</h2>
+          </div>
+          <button id="closeCoachBtn" class="icon-btn" aria-label="Закрыть">×</button>
+        </div>
+        <div id="coachContent" class="coach-content">
+          Веди диалог сама. Если застрянешь — нажми «Подсказка». Она не даст готовый скрипт, а покажет, что сейчас важно заметить.
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="accessModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="eyebrow">Защита тренажёра</div>
+      <h2>Код доступа</h2>
+      <p>Введи личный код, который задашь в Cloudflare. Он нужен только чтобы никто посторонний не расходовал твой API.</p>
+      <input id="accessInput" type="password" autocomplete="current-password" placeholder="Код доступа" />
+      <div id="accessError" class="error-text hidden"></div>
+      <button id="accessBtn" class="btn btn-primary btn-block">Открыть тренажёр</button>
+    </div>
+  </div>
+
+  <div id="loader" class="loader hidden">
+    <div class="loader-dot"></div>
+    <div id="loaderText">ИИ думает…</div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
