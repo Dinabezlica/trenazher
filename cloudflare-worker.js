@@ -253,18 +253,64 @@ function json(data, status, origin) {
   });
 }
 
-function workersAiText(payload) {
-  if (typeof payload === "string") return payload.trim();
-  if (payload && typeof payload.response === "string") return payload.response.trim();
-  if (payload && payload.result && typeof payload.result.response === "string") return payload.result.response.trim();
-  if (payload && payload.choices && payload.choices[0] && payload.choices[0].message) {
-    var content = payload.choices[0].message.content;
-    if (typeof content === "string") return content.trim();
-    if (Array.isArray(content)) {
-      return content.map(function(x) { return x && (x.text || x.content) ? (x.text || x.content) : ""; }).join("").trim();
+function contentToText(value) {
+  if (typeof value === "string") return value.trim();
+
+  if (Array.isArray(value)) {
+    var parts = value.map(function(item) {
+      if (typeof item === "string") return item;
+      if (!item || typeof item !== "object") return "";
+      if (typeof item.text === "string") return item.text;
+      if (typeof item.content === "string") return item.content;
+      if (typeof item.response === "string") return item.response;
+      if (item.message) return contentToText(item.message);
+      return "";
+    }).filter(Boolean);
+    return parts.join("").trim();
+  }
+
+  if (value && typeof value === "object") {
+    if (typeof value.text === "string") return value.text.trim();
+    if (typeof value.content === "string") return value.content.trim();
+    if (typeof value.response === "string") return value.response.trim();
+    if (value.content) {
+      var fromContent = contentToText(value.content);
+      if (fromContent) return fromContent;
+    }
+    if (value.message) {
+      var fromMessage = contentToText(value.message);
+      if (fromMessage) return fromMessage;
     }
   }
-  throw new Error("Workers AI вернул ответ в неожиданном формате.");
+
+  return "";
+}
+
+function workersAiText(payload) {
+  if (typeof payload === "string") return payload.trim();
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Workers AI не вернул текстовый ответ.");
+  }
+
+  var candidates = [
+    payload.response,
+    payload.output_text,
+    payload.content,
+    payload.message,
+    payload.result && payload.result.response,
+    payload.result && payload.result.output_text,
+    payload.result && payload.result.content,
+    payload.result && payload.result.message,
+    payload.choices && payload.choices[0] && payload.choices[0].message,
+    payload.result && payload.result.choices && payload.result.choices[0] && payload.result.choices[0].message
+  ];
+
+  for (var i = 0; i < candidates.length; i++) {
+    var text = contentToText(candidates[i]);
+    if (text) return text;
+  }
+
+  throw new Error("Workers AI ответил, но текст не удалось прочитать. Попробуй отправить сообщение ещё раз.");
 }
 
 function parseJsonLoose(text) {
