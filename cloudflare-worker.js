@@ -1,5 +1,3 @@
-const OPENAI_URL = "https://api.openai.com/v1/responses";
-
 const ALLOWED_ORIGINS = new Set([
   "https://dinabezlica.github.io",
   "http://localhost:8787",
@@ -255,17 +253,18 @@ function json(data, status, origin) {
   });
 }
 
-function outputText(payload) {
-  if (payload.output_text) return payload.output_text;
-  var chunks = [];
-  for (var i = 0; i < (payload.output || []).length; i++) {
-    var item = payload.output[i];
-    for (var j = 0; j < (item.content || []).length; j++) {
-      var c = item.content[j];
-      if (c.type === "output_text" && c.text) chunks.push(c.text);
+function workersAiText(payload) {
+  if (typeof payload === "string") return payload.trim();
+  if (payload && typeof payload.response === "string") return payload.response.trim();
+  if (payload && payload.result && typeof payload.result.response === "string") return payload.result.response.trim();
+  if (payload && payload.choices && payload.choices[0] && payload.choices[0].message) {
+    var content = payload.choices[0].message.content;
+    if (typeof content === "string") return content.trim();
+    if (Array.isArray(content)) {
+      return content.map(function(x) { return x && (x.text || x.content) ? (x.text || x.content) : ""; }).join("").trim();
     }
   }
-  return chunks.join("\n").trim();
+  throw new Error("Workers AI вернул ответ в неожиданном формате.");
 }
 
 function parseJsonLoose(text) {
@@ -277,26 +276,20 @@ function parseJsonLoose(text) {
 }
 
 async function openai(env, options) {
-  var res = await fetch(OPENAI_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer " + env.OPENAI_API_KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: options.model,
-      instructions: options.instructions,
-      input: options.input,
-      reasoning: { effort: options.effort || "low" },
-      max_output_tokens: options.maxOutput || 2500
-    })
+  if (!env.AI) {
+    throw new Error("Не подключён Workers AI binding.");
+  }
+
+  var result = await env.AI.run("@cf/zai-org/glm-4.7-flash", {
+    messages: [
+      { role: "system", content: options.instructions },
+      { role: "user", content: options.input }
+    ],
+    max_completion_tokens: options.maxOutput || 2500,
+    temperature: options.effort === "medium" ? 0.65 : 0.45
   });
 
-  var payload = await res.json();
-  if (!res.ok) {
-    throw new Error(payload && payload.error && payload.error.message ? payload.error.message : "Ошибка OpenAI API");
-  }
-  return outputText(payload);
+  return workersAiText(result);
 }
 
 function compactTranscript(messages) {
