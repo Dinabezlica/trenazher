@@ -365,7 +365,7 @@ async function openai(env, options) {
     throw new Error("Не подключён Workers AI binding.");
   }
 
-  var model = options.cloudflareModel || "@cf/meta/llama-3.1-8b-instruct";
+  var model = options.cloudflareModel || "@cf/meta/llama-3.1-8b-instruct-fast";
   var request = {
     messages: [
       { role: "system", content: options.instructions },
